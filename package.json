@@ -1,0 +1,60 @@
+{
+  "name": "xrpl-stablecoin-service",
+  "version": "0.1.0",
+  "description": "XRPL stablecoin issuance platform - REST API backend on Google Cloud Run",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "rm -rf dist && tsc && tsc-alias",
+    "start": "node dist/${SERVICE:-token}/index.js",
+    "start:token": "node dist/token/index.js",
+    "start:bank": "node dist/bank/index.js",
+    "dev:token": "tsx watch src/token/index.ts",
+    "dev:bank": "tsx watch src/bank/index.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check",
+    "lint:fix": "biome check --write --unsafe",
+    "check": "pnpm run typecheck && pnpm run lint",
+    "fix": "pnpm run lint:fix",
+    "test": "jest --verbose",
+    "test:watch": "jest --watch --verbose",
+    "test:coverage": "jest --coverage --verbose"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "dependencies": {
+    "@google-cloud/kms": "^5.3.0",
+    "@google-cloud/pubsub": "^5.2.3",
+    "@google-cloud/secret-manager": "^6.1.1",
+    "cors": "^2.8.6",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "express-openapi-validator": "^5.6.2",
+    "firebase-admin": "^13.6.1",
+    "google-auth-library": "^10.5.0",
+    "helmet": "^8.1.0",
+    "ripple-keypairs": "^2.0.0",
+    "swagger-ui-express": "^5.0.1",
+    "xrpl": "^4.6.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.3.15",
+    "@jest/globals": "^30.2.0",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^25.2.3",
+    "@types/supertest": "^6.0.3",
+    "@types/swagger-ui-express": "^4.1.8",
+    "bip39": "^3.1.0",
+    "jest": "^30.2.0",
+    "supertest": "^7.2.2",
+    "ts-jest": "^29.4.6",
+    "ts-node": "^10.9.2",
+    "tsc-alias": "^1.8.16",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  },
+  "packageManager": "pnpm@10.29.3+sha512.498e1fb4cca5aa06c1dcf2611e6fafc50972ffe7189998c409e90de74566444298ffe43e6cd2acdc775ba1aa7cc5e092a8b7054c811ba8c5770f84693d33d2dc"
+}
