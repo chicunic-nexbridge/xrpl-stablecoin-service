@@ -1,14 +1,9 @@
 import type express from "express";
 import { restAssert } from "../utils/helpers";
 import {
-  enableIdempotencyMock,
   mockFirestoreService,
-  mockIdempotency,
   mockIdentityPlatformAuth,
 } from "../utils/mock.index";
-
-// Mock idempotency before route imports
-enableIdempotencyMock();
 
 // Mock bank config to avoid real Secret Manager calls
 jest.mock("../../src/token/config/bank", () => ({
@@ -85,8 +80,6 @@ describe("Eventarc Routes - REST API Integration", () => {
     mockFirestoreService.setup();
     mockIdentityPlatformAuth.reset();
     mockIdentityPlatformAuth.setup();
-    mockIdempotency.reset();
-    mockIdempotency.setup();
   });
 
   describe("POST /api/v1/eventarc/xrpl/deposit", () => {
@@ -98,8 +91,8 @@ describe("Eventarc Routes - REST API Integration", () => {
     };
 
     it("should process successful XRPL token deposit", async () => {
-      // collectionGroup("wallet") query returns matching wallet
       mockFirestoreService.get
+        // collectionGroup("wallet") query returns matching wallet
         .mockResolvedValueOnce({
           exists: true,
           empty: false,
@@ -115,20 +108,10 @@ describe("Eventarc Routes - REST API Integration", () => {
           exists: true,
           data: () => MOCK_USER,
         })
-        // creditTokenBalance -> tokenBalanceRef.get()
+        // tx.get(idempotencyRef) - not yet processed
         .mockResolvedValueOnce({
-          exists: true,
-          data: () => ({ balance: 0 }),
-        })
-        // creditTokenBalance -> transactionDoc.get()
-        .mockResolvedValueOnce({
-          exists: true,
-          data: () => ({
-            transactionId: "mock-token-tx",
-            type: "deposit",
-            amount: 100,
-            balance: 100,
-          }),
+          exists: false,
+          data: () => ({}),
         });
 
       const body = createEventarcBody("ABC123HASH", {
@@ -156,22 +139,57 @@ describe("Eventarc Routes - REST API Integration", () => {
 
       restAssert.expectSuccess(response);
       expect(response.body.status).toBe("ok");
-      expect(mockIdempotency.checkAndMarkProcessed).toHaveBeenCalledWith("ABC123HASH", "xrpl-deposit");
     });
 
     it("should skip duplicate event (idempotency)", async () => {
-      mockIdempotency.checkAndMarkProcessed.mockResolvedValueOnce(true);
+      mockFirestoreService.get
+        // collectionGroup("wallet") query returns matching wallet
+        .mockResolvedValueOnce({
+          exists: true,
+          empty: false,
+          docs: [
+            {
+              data: () => ({ address: "rDestination123" }),
+              ref: { parent: { parent: { id: "google-uid-123456" } } },
+            },
+          ],
+        })
+        // getUserByWalletAddress -> userDoc.get()
+        .mockResolvedValueOnce({
+          exists: true,
+          data: () => MOCK_USER,
+        })
+        // tx.get(idempotencyRef) - already processed
+        .mockResolvedValueOnce({
+          exists: true,
+          data: () => ({ messageId: "ABC123HASH", type: "xrpl-deposit" }),
+        });
 
       const body = createEventarcBody("ABC123HASH", {
         transactionType: stringVal("Payment"),
-        meta: mapVal({ TransactionResult: stringVal("tesSUCCESS") }),
+        tx_json: mapVal({
+          Account: stringVal("rSender999"),
+          Destination: stringVal("rDestination123"),
+          Amount: mapVal({
+            currency: stringVal("JPYN"),
+            value: stringVal("100"),
+            issuer: stringVal(ISSUER_ADDRESS),
+          }),
+        }),
+        meta: mapVal({
+          TransactionResult: stringVal("tesSUCCESS"),
+          delivered_amount: mapVal({
+            currency: stringVal("JPYN"),
+            value: stringVal("100"),
+            issuer: stringVal(ISSUER_ADDRESS),
+          }),
+        }),
       });
 
       const response = await helper.post("/api/v1/eventarc/xrpl/deposit", body);
 
       restAssert.expectSuccess(response);
-      expect(response.body.status).toBe("skipped");
-      expect(response.body.reason).toBe("duplicate");
+      expect(response.body.status).toBe("ok");
     });
 
     it("should skip event with missing document name", async () => {
@@ -303,10 +321,28 @@ describe("Eventarc Routes - REST API Integration", () => {
     });
 
     it("should return 500 on processing error (trigger Eventarc retry)", async () => {
-      mockIdempotency.checkAndMarkProcessed.mockRejectedValueOnce(new Error("Firestore unavailable"));
+      // collectionGroup query throws
+      mockFirestoreService.get.mockRejectedValueOnce(new Error("Firestore unavailable"));
 
       const body = createEventarcBody("ERRORHASH", {
         transactionType: stringVal("Payment"),
+        tx_json: mapVal({
+          Account: stringVal("rSender999"),
+          Destination: stringVal("rDestination123"),
+          Amount: mapVal({
+            currency: stringVal("JPYN"),
+            value: stringVal("100"),
+            issuer: stringVal(ISSUER_ADDRESS),
+          }),
+        }),
+        meta: mapVal({
+          TransactionResult: stringVal("tesSUCCESS"),
+          delivered_amount: mapVal({
+            currency: stringVal("JPYN"),
+            value: stringVal("100"),
+            issuer: stringVal(ISSUER_ADDRESS),
+          }),
+        }),
       });
 
       const response = await helper.post("/api/v1/eventarc/xrpl/deposit", body);

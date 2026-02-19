@@ -15,10 +15,10 @@ const TOKEN_CONFIGS: Record<string, TokenConfig> = {
     tokenId: "JPYN",
     name: "JPYN",
     currency: "JPYN",
-    domain: process.env.ISSUER_DOMAIN ?? "example.com",
-    issuerAddress: process.env.JPYN_ISSUER_ADDRESS ?? "",
+    domain: "nexbridge.dev",
+    issuerAddress: "rpPqDaWncvBULqLLZULS4svoi1fxW4sPjp",
     kmsKeyPath: process.env.JPYN_KMS_KEY_PATH ?? "",
-    signingPublicKey: process.env.JPYN_SIGNING_PUBLIC_KEY ?? "",
+    signingPublicKey: "ED9CBF796AF94F722DE72A56FFD44E2239E92151A593BE69E51FDF86DDEA04EEE5",
   },
 };
 

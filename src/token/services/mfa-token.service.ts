@@ -1,33 +1,13 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-const MFA_TOKEN_SECRET_PATH = process.env.MFA_TOKEN_SECRET_PATH;
 const MFA_TOKEN_TTL = 300; // 5 minutes
 
-let cachedMfaSecret: string | null = null;
-
-export async function getMfaSecret(): Promise<string> {
-  if (cachedMfaSecret) {
-    return cachedMfaSecret;
+export function getMfaSecret(): string {
+  const secret = process.env.MFA_TOKEN_SECRET;
+  if (!secret) {
+    throw new Error("MFA_TOKEN_SECRET is not configured");
   }
-
-  if (!MFA_TOKEN_SECRET_PATH) {
-    throw new Error("MFA_TOKEN_SECRET_PATH is not configured");
-  }
-
-  const { SecretManagerServiceClient } = await import("@google-cloud/secret-manager");
-  const secretClient = new SecretManagerServiceClient();
-
-  const [version] = await secretClient.accessSecretVersion({
-    name: MFA_TOKEN_SECRET_PATH,
-  });
-
-  const payload = version.payload?.data;
-  if (!payload) {
-    throw new Error("Failed to retrieve MFA_TOKEN_SECRET from Secret Manager");
-  }
-
-  cachedMfaSecret = typeof payload === "string" ? payload : new TextDecoder().decode(payload as Uint8Array);
-  return cachedMfaSecret;
+  return secret;
 }
 
 function base64UrlEncode(data: string): string {

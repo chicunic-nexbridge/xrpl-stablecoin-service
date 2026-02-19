@@ -7,13 +7,7 @@ let pubSubClient: PubSub | null = null;
 export function initializePubSub(): void {
   if (pubSubClient) return;
 
-  const projectId = process.env.GOOGLE_CLOUD_PROJECT;
-  if (!projectId && !process.env.PUBSUB_EMULATOR_HOST) {
-    console.warn("Pub/Sub: GOOGLE_CLOUD_PROJECT not set and no emulator configured, skipping initialization");
-    return;
-  }
-
-  pubSubClient = new PubSub({ projectId });
+  pubSubClient = new PubSub();
   console.log("Pub/Sub client initialized");
 }
 

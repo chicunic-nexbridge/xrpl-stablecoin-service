@@ -1,33 +1,12 @@
 import { getFirestore } from "@common/config/firebase.js";
 import { Wallet } from "xrpl";
 
-const MNEMONIC_SECRET_PATH = process.env.MNEMONIC_SECRET_PATH;
-
-let cachedMnemonic: string | null = null;
-
-async function getMnemonic(): Promise<string> {
-  if (cachedMnemonic) {
-    return cachedMnemonic;
+function getMnemonic(): string {
+  const mnemonic = process.env.MNEMONIC;
+  if (!mnemonic) {
+    throw new Error("MNEMONIC is not configured");
   }
-
-  if (!MNEMONIC_SECRET_PATH) {
-    throw new Error("MNEMONIC_SECRET_PATH is not configured");
-  }
-
-  const { SecretManagerServiceClient } = await import("@google-cloud/secret-manager");
-  const secretClient = new SecretManagerServiceClient();
-
-  const [version] = await secretClient.accessSecretVersion({
-    name: MNEMONIC_SECRET_PATH,
-  });
-
-  const payload = version.payload?.data;
-  if (!payload) {
-    throw new Error("Failed to retrieve mnemonic from Secret Manager");
-  }
-
-  cachedMnemonic = typeof payload === "string" ? payload : new TextDecoder().decode(payload as Uint8Array);
-  return cachedMnemonic;
+  return mnemonic;
 }
 
 function derivationPath(index: number): string {

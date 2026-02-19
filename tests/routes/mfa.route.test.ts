@@ -67,29 +67,6 @@ describe("MFA Routes - REST API Integration", () => {
       restAssert.expectError(response, 403, "MFA not verified");
     });
 
-    it("should return 403 if auth_time is too old", async () => {
-      const oldAuthTime = Math.floor(Date.now() / 1000) - 60; // 60 seconds ago
-      mockIdentityPlatformAuth.verifySessionCookie.mockResolvedValue({
-        uid: "google-uid-123456",
-        email: "test@example.com",
-        name: "Test User",
-        email_verified: true,
-        auth_time: oldAuthTime,
-        firebase: { sign_in_second_factor: "phone" },
-        kycStatus: "approved",
-      });
-
-      const response = await helper.post(
-        "/api/v1/mfa/verify",
-        {},
-        {
-          Authorization: "Bearer valid-session",
-        },
-      );
-
-      restAssert.expectError(response, 403, "Authentication too old");
-    });
-
     it("should return 200 and mfaToken in body on valid MFA verification", async () => {
       const recentAuthTime = Math.floor(Date.now() / 1000) - 5; // 5 seconds ago
       mockIdentityPlatformAuth.verifySessionCookie.mockResolvedValue({

@@ -1,8 +1,12 @@
 substitutions:
   _REGION: us-central1
-  _SERVICE_ACCOUNT: xrpl-token-sa@${PROJECT_ID}.iam.gserviceaccount.com
+  _SERVICE_ACCOUNT: ""
   _XRPL_NETWORK: testnet
   _SIGNING_PROVIDER: sm
+  _JPYN_KMS_KEY_PATH: "projects/PROJECT/secrets/xrpl-issuer-seed/versions/latest"
+  _JPYN_ISSUER_ADDRESS: ""
+  _JPYN_SIGNING_PUBLIC_KEY: ""
+  _ISSUER_DOMAIN: ""
 
 steps:
   # 1. Deploy bank service
@@ -19,7 +23,8 @@ steps:
       - "--cpu=1"
       - "--max-instances=2"
       - "--min-instances=1"
-      - "--set-env-vars=SERVICE=bank,NODE_ENV=staging,LOG_LEVEL=info,GOOGLE_CLOUD_PROJECT=${PROJECT_ID},BANK_JWT_SECRET_PATH=projects/${PROJECT_ID}/secrets/bank-jwt-secret/versions/latest"
+      - "--set-env-vars=SERVICE=bank,NODE_ENV=staging,LOG_LEVEL=info"
+      - "--set-secrets=BANK_JWT_SECRET=bank-jwt-secret:latest"
       - "--startup-probe=httpGet.path=/health,httpGet.port=8080,periodSeconds=10"
       - "--liveness-probe=httpGet.path=/health,httpGet.port=8080,periodSeconds=300"
       - "--ingress=all"
@@ -47,17 +52,17 @@ steps:
         SERVICE=token,\
         NODE_ENV=staging,\
         LOG_LEVEL=info,\
-        GOOGLE_CLOUD_PROJECT=${PROJECT_ID},\
         XRPL_NETWORK=${_XRPL_NETWORK},\
         SIGNING_PROVIDER=${_SIGNING_PROVIDER},\
         BANK_SERVICE_URL=$$BANK_URL,\
-        MNEMONIC_SECRET_PATH=projects/${PROJECT_ID}/secrets/xrpl-mnemonic/versions/latest,\
-        BANK_AUTH_TOKEN_SECRET_PATH=projects/${PROJECT_ID}/secrets/bank-auth-token/versions/latest,\
-        MFA_TOKEN_SECRET_PATH=projects/${PROJECT_ID}/secrets/mfa-token-secret/versions/latest,\
-        JPYN_ISSUER_ADDRESS=$${JPYN_ISSUER_ADDRESS},\
-        JPYN_KMS_KEY_PATH=projects/${PROJECT_ID}/secrets/xrpl-issuer-seed/versions/latest,\
-        JPYN_SIGNING_PUBLIC_KEY=$${JPYN_SIGNING_PUBLIC_KEY},\
-        ISSUER_DOMAIN=$${ISSUER_DOMAIN}" \
+        JPYN_KMS_KEY_PATH=${_JPYN_KMS_KEY_PATH},\
+        JPYN_ISSUER_ADDRESS=${_JPYN_ISSUER_ADDRESS},\
+        JPYN_SIGNING_PUBLIC_KEY=${_JPYN_SIGNING_PUBLIC_KEY},\
+        ISSUER_DOMAIN=${_ISSUER_DOMAIN}" \
+          --set-secrets="\
+        MNEMONIC=xrpl-mnemonic:latest,\
+        BANK_AUTH_TOKEN=bank-auth-token:latest,\
+        MFA_TOKEN_SECRET=mfa-token-secret:latest" \
           --startup-probe=httpGet.path=/health,httpGet.port=8080,periodSeconds=10 \
           --liveness-probe=httpGet.path=/health,httpGet.port=8080,periodSeconds=300 \
           --ingress=all \

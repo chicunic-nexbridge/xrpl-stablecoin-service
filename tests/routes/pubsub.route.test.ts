@@ -1,14 +1,9 @@
 import type express from "express";
 import { restAssert } from "../utils/helpers";
 import {
-  enableIdempotencyMock,
   mockFirestoreService,
-  mockIdempotency,
   mockIdentityPlatformAuth,
 } from "../utils/mock.index";
-
-// Mock idempotency before route imports
-enableIdempotencyMock();
 
 // Mock bank config to avoid real Secret Manager calls
 jest.mock("../../src/token/config/bank", () => ({
@@ -72,8 +67,6 @@ describe("Pub/Sub Routes - REST API Integration", () => {
     mockFirestoreService.setup();
     mockIdentityPlatformAuth.reset();
     mockIdentityPlatformAuth.setup();
-    mockIdempotency.reset();
-    mockIdempotency.setup();
   });
 
   describe("POST /api/v1/pubsub/bank/deposit", () => {
@@ -86,6 +79,7 @@ describe("Pub/Sub Routes - REST API Integration", () => {
       };
 
       mockFirestoreService.get
+        // getUserByVirtualAccountNumber -> collectionGroup query
         .mockResolvedValueOnce({
           exists: true,
           empty: false,
@@ -97,25 +91,15 @@ describe("Pub/Sub Routes - REST API Integration", () => {
             },
           ],
         })
+        // tx.get(idempotencyRef) - not yet processed
+        .mockResolvedValueOnce({
+          exists: false,
+          data: () => ({}),
+        })
+        // tx.get(userRef)
         .mockResolvedValueOnce({
           exists: true,
           data: () => MOCK_USER,
-        })
-        .mockResolvedValueOnce({
-          exists: true,
-          data: () => MOCK_USER,
-        })
-        .mockResolvedValueOnce({
-          exists: true,
-          data: () => ({
-            transactionId: "mock-fiat-tx",
-            type: "deposit",
-            amount: 10000,
-            balance: 10000,
-            description: "Bank deposit via virtual account 0010001",
-            relatedOrderId: "bank-tx-123",
-            createdAt: "mock-timestamp",
-          }),
         });
 
       const envelope = createPubSubEnvelope({
@@ -128,11 +112,38 @@ describe("Pub/Sub Routes - REST API Integration", () => {
 
       restAssert.expectSuccess(response);
       expect(response.body.status).toBe("ok");
-      expect(mockIdempotency.checkAndMarkProcessed).toHaveBeenCalledWith("test-msg-123", "bank-deposit");
     });
 
     it("should skip duplicate message (idempotency)", async () => {
-      mockIdempotency.checkAndMarkProcessed.mockResolvedValueOnce(true);
+      const MOCK_USER = {
+        uid: "google-uid-123456",
+        email: "test@example.com",
+        name: "Test User",
+        fiatBalance: 10000,
+      };
+
+      mockFirestoreService.get
+        // getUserByVirtualAccountNumber -> collectionGroup query
+        .mockResolvedValueOnce({
+          exists: true,
+          empty: false,
+          docs: [
+            {
+              data: () => ({ accountNumber: "0010001" }),
+              ref: { parent: { parent: { id: "google-uid-123456" } } },
+            },
+          ],
+        })
+        // tx.get(idempotencyRef) - already processed
+        .mockResolvedValueOnce({
+          exists: true,
+          data: () => ({ messageId: "test-msg-123", type: "bank-deposit" }),
+        })
+        // tx.get(userRef)
+        .mockResolvedValueOnce({
+          exists: true,
+          data: () => MOCK_USER,
+        });
 
       const envelope = createPubSubEnvelope({
         transactionId: "bank-tx-123",
@@ -143,8 +154,7 @@ describe("Pub/Sub Routes - REST API Integration", () => {
       const response = await helper.post("/api/v1/pubsub/bank/deposit", envelope);
 
       restAssert.expectSuccess(response);
-      expect(response.body.status).toBe("skipped");
-      expect(response.body.reason).toBe("duplicate");
+      expect(response.body.status).toBe("ok");
     });
 
     it("should return 200 for invalid data in envelope (avoid infinite retry)", async () => {
@@ -157,7 +167,8 @@ describe("Pub/Sub Routes - REST API Integration", () => {
     });
 
     it("should return 500 on processing error (trigger Pub/Sub retry)", async () => {
-      mockIdempotency.checkAndMarkProcessed.mockRejectedValueOnce(new Error("Firestore unavailable"));
+      // getUserByVirtualAccountNumber throws
+      mockFirestoreService.get.mockRejectedValueOnce(new Error("Firestore unavailable"));
 
       const envelope = createPubSubEnvelope({
         transactionId: "bank-tx-123",

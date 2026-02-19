@@ -10,32 +10,12 @@ export interface BankAuthenticatedRequest extends Request {
   };
 }
 
-const BANK_JWT_SECRET_PATH = process.env.BANK_JWT_SECRET_PATH;
-let cachedJwtSecret: string | null = null;
-
-async function getJwtSecret(): Promise<string> {
-  if (cachedJwtSecret) {
-    return cachedJwtSecret;
+function getJwtSecret(): string {
+  const secret = process.env.BANK_JWT_SECRET;
+  if (!secret) {
+    throw new Error("BANK_JWT_SECRET is not configured");
   }
-
-  if (!BANK_JWT_SECRET_PATH) {
-    throw new Error("BANK_JWT_SECRET_PATH is not configured");
-  }
-
-  const { SecretManagerServiceClient } = await import("@google-cloud/secret-manager");
-  const secretClient = new SecretManagerServiceClient();
-
-  const [version] = await secretClient.accessSecretVersion({
-    name: BANK_JWT_SECRET_PATH,
-  });
-
-  const payload = version.payload?.data;
-  if (!payload) {
-    throw new Error("Failed to retrieve BANK_JWT_SECRET from Secret Manager");
-  }
-
-  cachedJwtSecret = typeof payload === "string" ? payload : new TextDecoder().decode(payload as Uint8Array);
-  return cachedJwtSecret;
+  return secret;
 }
 
 function base64UrlEncode(data: string): string {

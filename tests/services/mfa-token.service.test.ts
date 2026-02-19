@@ -1,10 +1,4 @@
-process.env.MFA_TOKEN_SECRET_PATH = "projects/test/secrets/mfa-secret/versions/latest";
-
-jest.mock("@google-cloud/secret-manager", () => ({
-  SecretManagerServiceClient: jest.fn().mockImplementation(() => ({
-    accessSecretVersion: jest.fn().mockResolvedValue([{ payload: { data: "test-mfa-secret-key-for-testing" } }]),
-  })),
-}));
+process.env.MFA_TOKEN_SECRET = "test-mfa-secret-key-for-testing";
 
 import { generateMfaToken, verifyMfaToken } from "../../src/token/services/mfa-token.service";
 
